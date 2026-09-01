@@ -84,11 +84,13 @@ public class Kona {
 
     static String run(ToolCall call) {
         System.out.println("tool: " + Model.show(call));
-        String result = TOOLS.stream()
-                .filter(tool -> tool.name().equals(call.name()))
-                .findFirst()
-                .map(tool -> tool.body().run(call.arguments()))
-                .orElse("error: unknown tool " + call.name());
+        String result = allowed(call)
+                ? TOOLS.stream()
+                        .filter(tool -> tool.name().equals(call.name()))
+                        .findFirst()
+                        .map(tool -> tool.body().run(call.arguments()))
+                        .orElse("error: unknown tool " + call.name())
+                : "error: the user refused this call";
         System.out.println("  -> " + summary(result));
         return result;
     }
@@ -144,6 +146,21 @@ public class Kona {
         } catch (Exception e) {
             return "error: " + e.getMessage();
         }
+    }
+
+    static boolean allowed(ToolCall call) {
+        Path wanted = Path.of(call.arguments().getOrDefault("path", "."))
+                .toAbsolutePath().normalize();
+        Path here = Path.of(".").toAbsolutePath().normalize();
+        if (wanted.startsWith(here)) {
+            return true;
+        }
+
+        System.out.println();
+        System.out.println("  " + call.name() + " wants to reach outside this project.");
+        System.out.println("  " + wanted);
+        System.out.print("  y to allow, anything else to refuse: ");
+        return IN.hasNextLine() && IN.nextLine().trim().equalsIgnoreCase("y");
     }
 }
 
