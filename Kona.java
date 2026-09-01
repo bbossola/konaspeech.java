@@ -49,11 +49,20 @@ public class Kona {
     static String respond(Conversation conversation, String question) {
         conversation.add(Message.user(question));
 
+        boolean corrected = false;
+
         while (true) {
             Message reply = MODEL.reply(conversation, TOOLS);
             conversation.add(reply);
 
             if (reply.isAnswer()) {
+                if (reply.content().contains("<function=") && !corrected) {
+                    corrected = true;
+                    System.out.println("retry: the model wrote the call as text");
+                    conversation.add(Message.user(
+                            "Call the tool with the tool API. Do not write the call as text."));
+                    continue;
+                }
                 return reply.content();
             }
 
@@ -177,6 +186,10 @@ final class Model {
             HttpResponse<String> response =
                     HTTP.send(request, HttpResponse.BodyHandlers.ofString());
             JsonNode root = JSON.readTree(response.body());
+            if (root.has("error")) {
+                return Message.assistant(
+                        "the model cannot do this: " + root.path("error").path("message").asText());
+            }
             ObjectNode message = (ObjectNode) root.path("choices").path(0).path("message");
 
             List<ToolCall> calls = new ArrayList<>();
