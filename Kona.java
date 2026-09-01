@@ -71,6 +71,7 @@ public class Kona {
                             "Call the tool with the tool API. Do not write the call as text."));
                     continue;
                 }
+                trace(iteration, List.of());
                 return reply.content();
             }
 
@@ -78,6 +79,7 @@ public class Kona {
                 String result = run(call);
                 conversation.add(Message.toolResult(call, result));
             }
+            trace(iteration, reply.calls());
         }
         return "I used five iterations and I did not finish.";
     }
@@ -162,6 +164,20 @@ public class Kona {
         System.out.print("  y to allow, anything else to refuse: ");
         return IN.hasNextLine() && IN.nextLine().trim().equalsIgnoreCase("y");
     }
+
+    static void trace(int iteration, List<ToolCall> calls) {
+        if (System.getenv("KONA_TRACE") == null) {
+            return;
+        }
+        try {
+            Files.writeString(Path.of("trace.jsonl"),
+                    MODEL.line(iteration, calls) + "\n",
+                    java.nio.file.StandardOpenOption.CREATE,
+                    java.nio.file.StandardOpenOption.APPEND);
+        } catch (Exception e) {
+            System.out.println("trace failed: " + e.getMessage());
+        }
+    }
 }
 
 record Parameter(String name, String description) {
@@ -226,6 +242,7 @@ final class Model {
             "KONA_URL", "http://localhost:11434/v1/chat/completions");
     private static final String NAME =
             System.getenv().getOrDefault("KONA_MODEL", "qwen3-coder:latest");
+    private JsonNode usage = JSON.createObjectNode();
 
     Message reply(Conversation conversation, List<Tool> tools) {
         try {
@@ -242,6 +259,7 @@ final class Model {
             HttpResponse<String> response =
                     HTTP.send(request, HttpResponse.BodyHandlers.ofString());
             JsonNode root = JSON.readTree(response.body());
+            usage = root.path("usage");
             if (root.has("error")) {
                 return Message.assistant(
                         "the model cannot do this: " + root.path("error").path("message").asText());
@@ -323,5 +341,14 @@ final class Model {
             array.add(entry);
         }
         return array;
+    }
+
+    String line(int iteration, List<ToolCall> calls) {
+        ObjectNode line = JSON.createObjectNode();
+        line.put("iteration", iteration);
+        line.put("tools", calls.stream().map(ToolCall::name).toList().toString());
+        line.put("prompt_tokens", usage.path("prompt_tokens").asInt());
+        line.put("completion_tokens", usage.path("completion_tokens").asInt());
+        return line.toString();
     }
 }
