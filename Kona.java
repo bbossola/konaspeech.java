@@ -26,7 +26,15 @@ public class Kona {
             new Tool("list_files",
                      "List the files and the folders at a relative path.",
                      List.of(new Parameter("path", "the relative path, or . for the current folder")),
-                     arguments -> listFiles(arguments.get("path"))));
+                     arguments -> listFiles(arguments.get("path"))),
+            new Tool("edit_file",
+                     "Replace old_str with new_str in the file at path. An empty old_str creates the file.",
+                     List.of(new Parameter("path", "the relative path"),
+                             new Parameter("old_str", "the text to replace"),
+                             new Parameter("new_str", "the new text")),
+                     arguments -> editFile(arguments.get("path"),
+                                           arguments.get("old_str"),
+                                           arguments.get("new_str"))));
     static final Scanner IN = new Scanner(System.in);
 
     public static void main(String[] args) {
@@ -102,6 +110,28 @@ public class Kona {
             return entries.map(entry -> entry.getFileName().toString())
                     .sorted()
                     .reduce("", (all, one) -> all.isEmpty() ? one : all + "\n" + one);
+        } catch (Exception e) {
+            return "error: " + e.getMessage();
+        }
+    }
+
+    static String editFile(String path, String oldStr, String newStr) {
+        try {
+            Path file = Path.of(path);
+            if (oldStr.isEmpty()) {
+                Files.writeString(file, newStr);
+                return "created " + path;
+            }
+
+            String content = Files.readString(file);
+            int at = content.indexOf(oldStr);
+            if (at < 0) {
+                return "error: old_str is not in the file";
+            }
+
+            Files.writeString(file, content.substring(0, at) + newStr
+                    + content.substring(at + oldStr.length()));
+            return "edited " + path;
         } catch (Exception e) {
             return "error: " + e.getMessage();
         }
