@@ -59,7 +59,7 @@ public class Kona {
 
         boolean corrected = false;
 
-        while (true) {
+        for (int iteration = 0; iteration < 5; iteration++) {
             Message reply = MODEL.reply(conversation, TOOLS);
             conversation.add(reply);
 
@@ -79,6 +79,7 @@ public class Kona {
                 conversation.add(Message.toolResult(call, result));
             }
         }
+        return "I used five iterations and I did not finish.";
     }
 
     static String run(ToolCall call) {
@@ -99,7 +100,11 @@ public class Kona {
 
     static String readFile(String path) {
         try {
-            return Files.readString(Path.of(path));
+            String text = Files.readString(Path.of(path));
+            if (text.length() > 100_000) {
+                return text.substring(0, 100_000) + "\n<truncated at 100 KB>";
+            }
+            return text;
         } catch (Exception e) {
             return "error: " + e.getMessage();
         }
@@ -109,6 +114,7 @@ public class Kona {
         try (var entries = Files.list(Path.of(path))) {
             return entries.map(entry -> entry.getFileName().toString())
                     .sorted()
+                    .limit(200)
                     .reduce("", (all, one) -> all.isEmpty() ? one : all + "\n" + one);
         } catch (Exception e) {
             return "error: " + e.getMessage();
@@ -127,6 +133,9 @@ public class Kona {
             int at = content.indexOf(oldStr);
             if (at < 0) {
                 return "error: old_str is not in the file";
+            }
+            if (content.indexOf(oldStr, at + 1) >= 0) {
+                return "error: old_str appears more than once. Use a longer string that appears once.";
             }
 
             Files.writeString(file, content.substring(0, at) + newStr
