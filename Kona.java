@@ -22,7 +22,11 @@ public class Kona {
             new Tool("read_file",
                      "Read the contents of a file at a relative path.",
                      List.of(new Parameter("path", "the relative path")),
-                     arguments -> readFile(arguments.get("path"))));
+                     arguments -> readFile(arguments.get("path"))),
+            new Tool("list_files",
+                     "List the files and the folders at a relative path.",
+                     List.of(new Parameter("path", "the relative path, or . for the current folder")),
+                     arguments -> listFiles(arguments.get("path"))));
     static final Scanner IN = new Scanner(System.in);
 
     public static void main(String[] args) {
@@ -79,6 +83,16 @@ public class Kona {
     static String readFile(String path) {
         try {
             return Files.readString(Path.of(path));
+        } catch (Exception e) {
+            return "error: " + e.getMessage();
+        }
+    }
+
+    static String listFiles(String path) {
+        try (var entries = Files.list(Path.of(path))) {
+            return entries.map(entry -> entry.getFileName().toString())
+                    .sorted()
+                    .reduce("", (all, one) -> all.isEmpty() ? one : all + "\n" + one);
         } catch (Exception e) {
             return "error: " + e.getMessage();
         }
